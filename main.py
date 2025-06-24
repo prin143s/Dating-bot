@@ -103,7 +103,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # === Application Setup ===
 app = FastAPI()
-telegram_app = Application.builder().token(BOT_TOKEN).build()
+telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
+
 
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("match", match))
