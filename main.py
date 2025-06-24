@@ -9,7 +9,9 @@ from telegram.ext import (
 
 # === Environment Setup ===
 BOT_TOKEN = os.environ["BOT_TOKEN"]
-MONGODB_URI = os.environ["MONGODB_URI"]
+MONGODB_URI = os.getenv("MONGODB_URI")  # ✅ Must match your Render variable name
+client = MongoClient(MONGODB_URI)
+
 WEBHOOK_URL = os.environ["WEBHOOK_URL"]  # Set this in Render as: https://your-app-name.onrender.com/webhook
 
 client = MongoClient(MONGODB_URI)
