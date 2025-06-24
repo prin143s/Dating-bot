@@ -1,4 +1,5 @@
 import os
+import asyncio
 from fastapi import FastAPI, Request
 from pymongo import MongoClient
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -35,18 +36,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         join_btn = InlineKeyboardMarkup([[
             InlineKeyboardButton("Join Channel", url=f"https://t.me/{CHANNEL_USERNAME}")
         ]])
-        await update.message.reply_text("🚫 Please join our channel to use this bot.", reply_markup=join_btn)
+        await update.message.reply_text("\ud83d\udeab Please join our channel to use this bot.", reply_markup=join_btn)
         return
 
     users_col.update_one({"_id": uid}, {"$set": {"step": "name"}}, upsert=True)
-    await update.message.reply_text("👋 Welcome to the Dating Bot!\nWhat's your name?")
+    await update.message.reply_text("\ud83d\udc4b Welcome to the Dating Bot!\nWhat's your name?")
 
 # --- HANDLE MESSAGES ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     text = update.message.text
 
-    # Check if user is chatting
     chat = chats_col.find_one({"$or": [{"user1": uid}, {"user2": uid}]})
     if chat:
         partner_id = chat["user2"] if chat["user1"] == uid else chat["user1"]
@@ -77,7 +77,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Who are you looking for? (Male, Female, Any)")
     elif step == "preference":
         update_fields = {"preference": text, "step": "done"}
-        await update.message.reply_text("✅ Profile saved! Type /match to find people.")
+        await update.message.reply_text("\u2705 Profile saved! Type /match to find people.")
     else:
         await update.message.reply_text("Type /match to find people.")
         return
@@ -105,8 +105,8 @@ async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["current_match"] = match["_id"]
         profile = f"Name: {match['name']}\nAge: {match['age']}\nGender: {match['gender']}\nBio: {match['bio']}"
         buttons = [[
-            InlineKeyboardButton("❤️ Like", callback_data="like"),
-            InlineKeyboardButton("❌ Pass", callback_data="pass")
+            InlineKeyboardButton("\u2764\ufe0f Like", callback_data="like"),
+            InlineKeyboardButton("\u274c Pass", callback_data="pass")
         ]]
         await update.message.reply_text(profile, reply_markup=InlineKeyboardMarkup(buttons))
         return
@@ -130,8 +130,8 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         likes_col.update_one({"_id": uid}, {"$addToSet": {"liked": target_id}})
         target_likes = likes_col.find_one({"_id": target_id})
         if target_likes and uid in target_likes.get("liked", []):
-            await query.edit_message_text("🎉 It's a match! You can now chat.")
-            await context.bot.send_message(chat_id=target_id, text="🎉 You matched! Start chatting now!")
+            await query.edit_message_text("\ud83c\udf89 It's a match! You can now chat.")
+            await context.bot.send_message(chat_id=target_id, text="\ud83c\udf89 You matched! Start chatting now!")
 
             chats_col.update_one(
                 {"$or": [{"user1": uid, "user2": target_id}, {"user1": target_id, "user2": uid}]},
@@ -157,6 +157,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 @app.on_event("startup")
 async def on_startup():
     await telegram_app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
+    asyncio.create_task(telegram_app.initialize())
 
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
