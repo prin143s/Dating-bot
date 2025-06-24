@@ -8,8 +8,8 @@ from telegram.ext import (
 )
 
 # === Environment Setup ===
-BOT_TOKEN = os.environ["7712273658:AAFpN3hHkWwvUt8DpVYkXtkIv1wRvpuf338"]
-MONGODB_URI = os.environ["mongodb+srv://princekgupta:123Prinvi@@cluster0.2t4db1l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"]
+BOT_TOKEN = os.environ["BOT_TOKEN"]
+MONGODB_URI = os.environ["MONGODB_URI"]
 WEBHOOK_URL = os.environ["WEBHOOK_URL"]  # Set this in Render as: https://your-app-name.onrender.com/webhook
 
 client = MongoClient(MONGODB_URI)
