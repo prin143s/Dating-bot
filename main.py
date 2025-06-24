@@ -22,7 +22,7 @@ likes_col = db["likes"]
 chats_col = db["chats"]
 
 # Telegram & FastAPI Setup
-telegram_app = Application.builder().token(BOT_TOKEN).build()
+telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
 app = FastAPI()
 
 # --- START ---
