@@ -5,7 +5,7 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes
 )
 
-client = MongoClient("YOUR_MONGODB_URI")  # Replace with your MongoDB URI
+client = MongoClient("mongodb+srv://princekgupta:123Prinvi@@cluster0.2t4db1l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")  # Replace with your MongoDB URI
 db = client["dating_bot"]
 users_col = db["users"]
 likes_col = db["likes"]
