@@ -1,4 +1,4 @@
-python-telegram-bot==20.7
-pymongo==4.7.2
-fastapi==0.111.0
-uvicorn==0.29.0
+python-telegram-bot==20.8
+fastapi
+uvicorn
+pymongo
