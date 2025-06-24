@@ -38,7 +38,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         join_btn = InlineKeyboardMarkup([[
             InlineKeyboardButton("Join Channel", url=f"https://t.me/{CHANNEL_USERNAME}")
         ]])
-        await update.message.reply_text("\ud83d\udeab Please join our channel to use this bot.", reply_markup=join_btn)
+        await update.message.reply_text("Please join our channel to use this bot.", reply_markup=join_btn)
         return
 
     users_col.update_one({"_id": uid}, {"$set": {"step": "name"}}, upsert=True)
