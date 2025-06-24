@@ -1,15 +1,23 @@
+import os
+from fastapi import FastAPI, Request
 from pymongo import MongoClient
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, CommandHandler, MessageHandler,
-    CallbackQueryHandler, filters, ContextTypes
+    Application, CommandHandler, MessageHandler,
+    CallbackQueryHandler, ContextTypes, filters
 )
 
-client = MongoClient("mongodb+srv://princekgupta:123Prinvi@@cluster0.2t4db1l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")  # Replace with your MongoDB URI
+# === Environment Setup ===
+BOT_TOKEN = os.environ["7712273658:AAFpN3hHkWwvUt8DpVYkXtkIv1wRvpuf338"]
+MONGODB_URI = os.environ["mongodb+srv://princekgupta:123Prinvi@@cluster0.2t4db1l.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"]
+WEBHOOK_URL = os.environ["WEBHOOK_URL"]  # Set this in Render as: https://your-app-name.onrender.com/webhook
+
+client = MongoClient(MONGODB_URI)
 db = client["dating_bot"]
 users_col = db["users"]
 likes_col = db["likes"]
 
+# === Bot Logic ===
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     users_col.update_one({"_id": uid}, {"$set": {"step": "name"}}, upsert=True)
@@ -19,13 +27,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     text = update.message.text
     user = users_col.find_one({"_id": uid})
-
     if not user:
         return await update.message.reply_text("Please type /start to begin.")
-
     step = user.get("step")
     update_fields = {}
-
     if step == "name":
         update_fields = {"name": text, "step": "age"}
         await update.message.reply_text("Great! How old are you?")
@@ -46,7 +51,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Type /match to find people.")
         return
-
     users_col.update_one({"_id": uid}, {"$set": update_fields})
 
 async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -56,8 +60,6 @@ async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return await update.message.reply_text("Complete your profile with /start.")
 
     preference = user.get("preference", "Any").lower()
-
-    # Get users not yet liked or disliked
     liked_ids = likes_col.find_one({"_id": uid}) or {"liked": [], "disliked": []}
     liked_set = set(liked_ids.get("liked", []) + liked_ids.get("disliked", []))
 
@@ -82,15 +84,12 @@ async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     uid = query.from_user.id
     target_id = context.user_data.get("current_match")
-
     if not target_id:
         return await query.edit_message_text("No match selected.")
 
     likes_col.update_one({"_id": uid}, {"$setOnInsert": {"liked": [], "disliked": []}}, upsert=True)
-
     if query.data == "like":
         likes_col.update_one({"_id": uid}, {"$addToSet": {"liked": target_id}})
         target_likes = likes_col.find_one({"_id": target_id})
@@ -102,11 +101,24 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         likes_col.update_one({"_id": uid}, {"$addToSet": {"disliked": target_id}})
         await query.edit_message_text("Skipped. Type /match to continue.")
 
-app = ApplicationBuilder().token("7712273658:AAFpN3hHkWwvUt8DpVYkXtkIv1wRvpuf338").build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("match", match))
-app.add_handler(MessageHandler(filters.TEXT, handle_message))
-app.add_handler(CallbackQueryHandler(button))
+# === Application Setup ===
+app = FastAPI()
+telegram_app = Application.builder().token(BOT_TOKEN).build()
 
-if __name__ == "__main__":
-    app.run_polling()
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CommandHandler("match", match))
+telegram_app.add_handler(MessageHandler(filters.TEXT, handle_message))
+telegram_app.add_handler(CallbackQueryHandler(button))
+
+@app.on_event("startup")
+async def startup():
+    await telegram_app.initialize()
+    await telegram_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
+    await telegram_app.start()
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, telegram_app.bot)
+    await telegram_app.process_update(update)
+    return "ok"
