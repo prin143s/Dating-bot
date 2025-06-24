@@ -1,13 +1,15 @@
 services:
   - type: web
-    name: tg-dating-bot
-    env: python
+    name: telegram-dating-bot
+    runtime: python
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn main:app --host 0.0.0.0 --port 10000
     envVars:
       - key: BOT_TOKEN
-        sync: false
+        value: your_bot_token_here
       - key: MONGODB_URI
-        sync: false
+        value: your_mongo_uri_here
       - key: WEBHOOK_URL
-        sync: false
+        value: https://telegram-dating-bot.onrender.com
+      - key: CHANNEL_USERNAME
+        value: your_channel_username_without_@
