@@ -7,51 +7,49 @@ from telegram.ext import (
     CallbackQueryHandler, ContextTypes, filters
 )
 
-# ENV Vars
+# Environment variables
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 MONGODB_URI = os.getenv("MONGODB_URI")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # e.g. https://yourapp.onrender.com
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # https://your-app-name.onrender.com
 CHANNEL_USERNAME = os.getenv("CHANNEL_USERNAME")  # without @
 
-# MongoDB Setup
+# MongoDB setup
 client = MongoClient(MONGODB_URI)
 db = client["datingbot"]
 users_col = db["users"]
 likes_col = db["likes"]
 chats_col = db["chats"]
 
-# FastAPI + Telegram Setup
+# Telegram & FastAPI setup
 telegram_app = Application.builder().token(BOT_TOKEN).updater(None).build()
 
 app = FastAPI()
 
-# --- START COMMAND ---
+# Start command with force join check
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
 
-    # ✅ Check if user joined the channel
+    # ✅ Check channel membership
     try:
         member = await context.bot.get_chat_member(f"@{CHANNEL_USERNAME}", uid)
-        if member.status in ["left", "kicked"]:
-            raise Exception("Not a member")
+        if member.status in ("left", "kicked"):
+            raise Exception("Not in channel")
     except:
-        join_button = InlineKeyboardMarkup([[
+        btn = InlineKeyboardMarkup([[
             InlineKeyboardButton("📢 Join Channel", url=f"https://t.me/{CHANNEL_USERNAME}")
         ]])
-        await update.message.reply_text(
-            "🚫 You must join our channel to use this bot.",
-            reply_markup=join_button
-        )
+        await update.message.reply_text("🚫 Join our channel to use the bot.", reply_markup=btn)
         return
 
     users_col.update_one({"_id": uid}, {"$set": {"step": "name"}}, upsert=True)
     await update.message.reply_text("👋 Welcome to the Dating Bot!Created by @Prince_x_010\nWhat's your name?")
 
-# --- MESSAGE HANDLER ---
+# Handle profile creation and chat
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     text = update.message.text
 
+    # If in a matched chat, forward messages
     chat = chats_col.find_one({"$or": [{"user1": uid}, {"user2": uid}]})
     if chat:
         partner_id = chat["user2"] if chat["user1"] == uid else chat["user1"]
@@ -61,7 +59,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = users_col.find_one({"_id": uid})
     if not user:
-        return await update.message.reply_text("Please type /start to begin.")
+        return await update.message.reply_text("Type /start to begin.")
 
     step = user.get("step")
     update_fields = {}
@@ -89,12 +87,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     users_col.update_one({"_id": uid}, {"$set": update_fields})
 
-# --- MATCH COMMAND ---
+# Match command
 async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     user = users_col.find_one({"_id": uid})
     if not user or user.get("step") != "done":
-        return await update.message.reply_text("Please complete your profile with /start.")
+        return await update.message.reply_text("Complete your profile first using /start.")
 
     preference = user.get("preference", "any").lower()
     liked_ids = likes_col.find_one({"_id": uid}) or {"liked": [], "disliked": []}
@@ -118,11 +116,10 @@ async def match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("No more matches right now.")
 
-# --- LIKE/PASS BUTTON ---
+# Button callback (Like/Pass)
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     uid = query.from_user.id
     target_id = context.user_data.get("current_match")
 
@@ -137,7 +134,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if target_likes and uid in target_likes.get("liked", []):
             await query.edit_message_text("🎉 It's a match! You can now chat.")
             await context.bot.send_message(chat_id=target_id, text="🎉 You matched! Start chatting now!")
-
             chats_col.update_one(
                 {"$or": [{"user1": uid, "user2": target_id}, {"user1": target_id, "user2": uid}]},
                 {"$setOnInsert": {"user1": uid, "user2": target_id, "messages": []}},
@@ -149,7 +145,7 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         likes_col.update_one({"_id": uid}, {"$addToSet": {"disliked": target_id}})
         await query.edit_message_text("Skipped. Type /match to continue.")
 
-# --- PHOTO HANDLER ---
+# Handle photo sharing
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     chat = chats_col.find_one({"$or": [{"user1": uid}, {"user2": uid}]})
@@ -158,9 +154,10 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo = update.message.photo[-1].file_id
         await context.bot.send_photo(chat_id=partner_id, photo=photo)
 
-# --- Webhook Routes ---
+# --- Webhook Setup ---
 @app.on_event("startup")
 async def on_startup():
+    await telegram_app.initialize()  # ✅ REQUIRED for webhook apps
     await telegram_app.bot.set_webhook(f"{WEBHOOK_URL}/webhook")
 
 @app.post("/webhook")
@@ -170,7 +167,7 @@ async def telegram_webhook(request: Request):
     await telegram_app.process_update(update)
     return {"ok": True}
 
-# --- Register Handlers ---
+# --- Handlers ---
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(CommandHandler("match", match))
 telegram_app.add_handler(MessageHandler(filters.TEXT, handle_message))
