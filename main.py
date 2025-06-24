@@ -1,5 +1,7 @@
 import os
 import asyncio
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 from fastapi import FastAPI, Request
 from pymongo import MongoClient
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
